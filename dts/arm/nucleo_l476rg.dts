@@ -22,3 +22,8 @@
 	current-speed = <115200>;
 	status = "ok";
 };
+
+&usart1 {
+	current-speed = <115200>;
+	status = "ok";
+};

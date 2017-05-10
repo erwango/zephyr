@@ -17,7 +17,7 @@
 #include <uart.h>
 #include <ztest.h>
 
-#define UART_DEVICE_NAME CONFIG_UART_CONSOLE_ON_DEV_NAME
+#define UART_DEVICE_NAME CONFIG_UART_STM32_PORT_1_NAME
 
 void test_uart_poll_out(void);
 void test_uart_fifo_fill(void);
