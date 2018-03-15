@@ -13,14 +13,54 @@ set(GENERATED_DTS_BOARD_CONF ${PROJECT_BINARY_DIR}/include/generated/generated_d
 set_ifndef(DTS_SOURCE ${BOARD_ROOT}/boards/${ARCH}/${BOARD_FAMILY}/${BOARD}.dts)
 set_ifndef(DTS_COMMON_OVERLAYS ${PROJECT_SOURCE_DIR}/dts/common/common.dts)
 
+
+#Parse boards/shields to generate the shield list
+
+set(shield_dir ${ZEPHYR_BASE}/boards/shields)
+
+# Match the .overlay files in the shield directories to make sure we are
+# finding shields, e.g. x_nucleo_iks01a1/x_nucleo_iks01a1.overlay
+file(GLOB_RECURSE shields_refs_list
+     RELATIVE ${shield_dir}
+     ${shield_dir}/*/*.overlay
+     )
+
+# The above gives a list like
+# x_nucleo_iks01a1/x_nucleo_iks01a1.overlay;x_nucleo_iks01a2/x_nucleo_iks01a2.overlay
+# we construct a list of shield names by extracting file name and
+# removing the extension.
+foreach(shield_path ${shields_refs_list})
+  get_filename_component(shield ${shield_path} NAME_WE)
+
+  # Generate CONFIG flags matching each shield
+  string(TOUPPER "CONFIG_SHIELD_${shield}" shield_config)
+
+  if(${shield_config})
+    # if shield config flag is on, add shield overlay to the shield overlays
+    # list and dts.fixup file to the shield fixup file
+    set(DTC_SHIELD_OVERLAY_FILE ${DTC_SHIELD_OVERLAY_FILE} ${shield_dir}/${shield_path})
+    set(DTC_SHIELD_FIXUP ${DTC_SHIELD_FIXUP} ${shield_dir}/${shield}/dts.fixup)
+  endif()
+
+endforeach()
+
+
 message(STATUS "Generating zephyr/include/generated/generated_dts_board.h")
 
 if(CONFIG_HAS_DTS)
+
+  if(DTC_SHIELD_OVERLAY_FILE)
+    # Convert from space-separated files into file list
+    string(REPLACE " " ";" DTC_SHIELD_OVERLAY_FILES_AS_LIST ${DTC_SHIELD_OVERLAY_FILE})
+  endif()
 
   if(DTC_OVERLAY_FILE)
     # Convert from space-separated files into file list
     string(REPLACE " " ";" DTC_OVERLAY_FILE_AS_LIST ${DTC_OVERLAY_FILE})
   endif()
+
+  # Prepend shield overlays
+  set(DTC_OVERLAY_FILE_AS_LIST ${DTC_SHIELD_OVERLAY_FILES_AS_LIST} ${DTC_OVERLAY_FILE_AS_LIST})
 
   # Prepend common overlays
   set(DTC_OVERLAY_FILE_AS_LIST ${DTS_COMMON_OVERLAYS} ${DTC_OVERLAY_FILE_AS_LIST})
@@ -97,7 +137,7 @@ if(CONFIG_HAS_DTS)
     set(DTS_APP_FIXUP ${APPLICATION_SOURCE_DIR}/dts.fixup)
   endif()
 
-  set(DTS_FIXUPS ${DTS_SOC_FIXUP} ${DTS_BOARD_FIXUP} ${DTS_APP_FIXUP})
+  set(DTS_FIXUPS ${DTS_SOC_FIXUP} ${DTS_BOARD_FIXUP} ${DTC_SHIELD_FIXUP} ${DTS_APP_FIXUP})
   if(NOT "${DTS_FIXUPS}" STREQUAL "")
     set(DTS_FIXUPS --fixup ${DTS_FIXUPS})
   endif()

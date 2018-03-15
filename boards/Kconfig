@@ -23,3 +23,7 @@ endchoice
 menu "Board Options"
 source "$ENV_VAR_SYM_BOARD_DIR/Kconfig"
 endmenu
+
+menu "Shields"
+source "boards/shields/*/Kconfig.shield"
+endmenu

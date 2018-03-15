@@ -45,3 +45,4 @@ source "tests/Kconfig"
 #
 source "arch/$ENV_VAR_SYM_ARCH/soc/*/Kconfig.defconfig"
 source "$ENV_VAR_SYM_BOARD_DIR/Kconfig.defconfig"
+source "boards/shields/*/Kconfig.defconfig"
