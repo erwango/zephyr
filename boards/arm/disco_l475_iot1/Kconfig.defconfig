@@ -47,6 +47,23 @@ config PWM_STM32_2
 
 endif # PWM
 
+if LIS3MDL
+
+choice LIS3MDL_TRIGGER_MODE
+	default LIS3MDL_TRIGGER_NONE
+endchoice
+
+endif # LIS3MDL
+
+if HTS221
+
+choice HTS221_TRIGGER_MODE
+	default HTS221_TRIGGER_NONE
+endchoice
+
+endif # HTS221
+
+
 if VL53L0X
 
 config VL53L0X_XSHUT_GPIO_DEV_NAME
