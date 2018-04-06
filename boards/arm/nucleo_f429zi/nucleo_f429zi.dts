@@ -7,6 +7,10 @@
 /dts-v1/;
 #include <st/stm32f429.dtsi>
 
+/* Temp: define arduino_i2c */
+/* Workaround waiting meta-zephyr-sdk/issues/92 resolution */
+#define arduino_i2c i2c1
+
 / {
 	model = "STMicroelectronics STM32F429ZI-NUCLEO board";
 	compatible = "st,stm32f429zi-nucleo", "st,stm32f429";
@@ -48,8 +52,14 @@
 		led1 = &blue_led_1;
 		led2 = &red_led_1;
 		sw0 = &user_button;
+		/* Temp provide arduino i2c alias */
+		/* Workaround waiting meta-zephyr-sdk/issues/92 resolution */
+		arduino,i2c = &i2c1;
 	};
 };
+
+/* Define arduino_i2c as i2c1 override */
+/*arduino_i2c: &i2c1 {};*/
 
 &i2c1 {
 	status = "ok";
