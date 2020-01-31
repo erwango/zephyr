@@ -372,6 +372,17 @@ static int usb_dc_stm32_init(void)
 	}
 #endif /* USB */
 
+#ifdef SYSCFG_CFGR1_USB_IT_RMP
+	/* On STM32F302/F303 USB IRQ collides with CAN_1 IRQ */
+	/* Remap IRQ by default to enable use of both IPs simultaneoulsy */
+	if (LL_APB2_GRP1_IsEnabledClock(LL_APB2_GRP1_PERIPH_SYSCFG)) {
+		LL_SYSCFG_EnableRemapIT_USB();
+	} else {
+		LOG_ERR("System Configuration Controller clock is "
+			"disabled. Unable to enable IRQ remapping.");
+	}
+#endif
+
 	IRQ_CONNECT(DT_USB_IRQ, DT_USB_IRQ_PRI,
 		    usb_dc_stm32_isr, 0, 0);
 	irq_enable(DT_USB_IRQ);
@@ -395,7 +406,7 @@ int usb_dc_attach(void)
 		LL_SYSCFG_EnablePinRemap();
 	} else {
 		LOG_ERR("System Configuration Controller clock is "
-			"disable. Unable to enable pin remapping."
+			"disabled. Unable to enable pin remapping.");
 	}
 #endif
 
