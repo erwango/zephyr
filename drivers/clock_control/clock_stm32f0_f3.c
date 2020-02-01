@@ -77,6 +77,11 @@ void config_enable_default_clocks(void)
 	/* Enable System Configuration Controller clock. */
 	LL_APB1_GRP2_EnableClock(LL_APB1_GRP2_PERIPH_SYSCFG);
 #endif
+#else
+#if defined(CONFIG_USB_DC_STM32)
+	/* Enable System Configuration Controller clock. */
+	LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_SYSCFG);
+#endif
 #endif /* !CONFIG_SOC_SERIES_STM32F3X */
 }
 
