@@ -43,7 +43,7 @@ static int stm32c0_init(const struct device *arg)
 
 	/* Update CMSIS SystemCoreClock variable (HCLK) */
 	/* At reset, system core clock is set to 48 MHz from HSI */
-	SystemCoreClock = 48000000;
+	//SystemCoreClock = 48000000;
 
 	return 0;
 }

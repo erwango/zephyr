@@ -4,7 +4,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-#include <arm/armv6-m.dtsi>
+#include <arm/armv8.1-m.dtsi>
 #include <zephyr/dt-bindings/clock/stm32c0_clock.h>
 #include <zephyr/dt-bindings/gpio/gpio.h>
 #include <zephyr/dt-bindings/reset/stm32c0_reset.h>
@@ -90,17 +90,6 @@
 				compatible = "st,stm32-rcc-rctl";
 				#reset-cells = <1>;
 			};
-		};
-
-		exti: interrupt-controller@40021800 {
-			compatible = "st,stm32-exti";
-			interrupt-controller;
-			#interrupt-cells = <1>;
-			reg = <0x40021800 0x400>;
-			num-lines = <16>;
-			interrupts = <5 0>, <6 0>, <7 0>;
-			interrupt-names = "line0-1", "line2-3", "line4-15";
-			line-ranges = <0 2>, <2 2>, <4 12>;
 		};
 
 		pinctrl: pin-controller@50000000 {
