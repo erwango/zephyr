@@ -18,6 +18,7 @@
 	#size-cells = <1>;
 
 	chosen {
+		zephyr,bt-mon-uart = &usart1;
 		zephyr,console = &usart1;
 		zephyr,shell-uart = &usart1;
 		zephyr,sram = &sram0;
@@ -59,22 +60,17 @@
 	status = "okay";
 };
 
-&pll1 {
-	div-m = <8>;
-	mul-n = <48>;
-	div-q = <2>;
-	div-r = <2>;
-	clocks = <&clk_hse>;
+&clk_hsi {
 	status = "okay";
 };
 
 &rcc {
-	clocks = <&pll1>;
-	clock-frequency = <DT_FREQ_M(96)>;
+	clocks = <&clk_hse>;
+	clock-frequency = <DT_FREQ_M(32)>;
 	ahb-prescaler = <1>;
-	ahb5-prescaler = <4>;
+	ahb5-prescaler = <1>;
 	apb1-prescaler = <1>;
-	apb2-prescaler = <1>;
+	apb2-prescaler = <2>;
 	apb7-prescaler = <1>;
 };
 
@@ -87,6 +83,14 @@
 	pinctrl-names = "default";
 	current-speed = <115200>;
 	status = "okay";
+};
+
+&lpuart1 {
+       pinctrl-0 = <&lpuart1_tx_pb5 &lpuart1_rx_pa10 &lpuart1_cts_pa0 &lpuart1_rts_pb9>;
+       pinctrl-names = "default";
+       current-speed = <115200>;
+       hw-flow-control;
+       status = "okay";
 };
 
 &spi1 {
@@ -115,8 +119,25 @@
 	clocks = <&rcc STM32_CLOCK_BUS_APB7 0x00000800>,
 		 <&rcc STM32_SRC_LSE LPTIM1_SEL(3)>;
 	status = "okay";
+	clocks = <&rcc STM32_CLOCK_BUS_APB7 0x00000800>,
+		 <&rcc STM32_SRC_LSE LPTIM1_SEL(3)>;
 };
 
 &rng {
 	status = "okay";
+};
+
+&flash0 {
+	partitions {
+		compatible = "fixed-partitions";
+		#address-cells = <1>;
+		#size-cells = <1>;
+
+		/* Last 16K of flash: Min 2 sectors */
+		storage_partition: partition@f8000 {
+			label = "storage";
+			reg = <0x000f8000 DT_SIZE_K(16)>;
+		};
+
+	};
 };
