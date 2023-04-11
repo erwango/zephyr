@@ -351,7 +351,9 @@ static int bt_hci_stm32wba_open(void)
 
 	LOG_DBG("");
 
-	FD_SetStatus (FD_FLASHACCESS_RFTS_BYPASS, LL_FLASH_DISABLE);
+	if (IS_ENABLED(CONFIG_FLASH)) {
+		FD_SetStatus(FD_FLASHACCESS_RFTS_BYPASS, LL_FLASH_DISABLE);
+	}
 
 	return 0;
 }
