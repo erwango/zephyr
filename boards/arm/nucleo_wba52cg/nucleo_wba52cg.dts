@@ -46,6 +46,7 @@
 	aliases {
 		led0 = &blue_led_1;
 		sw0 = &user_button;
+		die-temp0 = &die_temp;
 	};
 };
 
@@ -122,6 +123,10 @@
 	status = "okay";
 	clocks = <&rcc STM32_CLOCK_BUS_APB7 0x00000800>,
 		 <&rcc STM32_SRC_LSE LPTIM1_SEL(3)>;
+};
+
+&die_temp {
+	status = "okay";
 };
 
 &rng {

@@ -17,4 +17,14 @@ config SPI_STM32_INTERRUPT
 config SYS_CLOCK_TICKS_PER_SEC
 	default 4096 if STM32_LPTIM_TIMER
 
+if BT
+
+config ADC
+	default y
+
+config SENSOR
+	default y
+
+endif
+
 endif # BOARD_NUCLEO_WBA52CG

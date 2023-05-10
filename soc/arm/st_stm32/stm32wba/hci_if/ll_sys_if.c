@@ -5,6 +5,8 @@
  */
 
 #include <zephyr/kernel.h>
+#include <zephyr/device.h>
+#include <zephyr/drivers/sensor.h>
 
 #include <zephyr/logging/log.h>
 #define LOG_LEVEL CONFIG_SOC_LOG_LEVEL
@@ -16,9 +18,9 @@ LOG_MODULE_REGISTER(ll_sys_if);
 #define LOG_SOC_DBG(...)
 #endif
 
+#include "app_conf.h"
 #include "ll_intf.h"
 #include "ll_sys.h"
-#include "adc_ctrl.h"
 #include "linklayer_plat.h"
 
 extern struct k_mutex ble_ctlr_stack_mutex;
@@ -29,6 +31,7 @@ struct k_work ll_sys_work, ll_sys_temp_work;
 
 void ll_sys_bg_temperature_measurement(void);
 static void request_temperature_measurement(void);
+const struct device *const dietemp_dev = DEVICE_DT_GET(DT_ALIAS(die_temp0));
 
 #endif /* USE_TEMPERATURE_BASED_RADIO_CALIBRATION */
 
@@ -71,17 +74,33 @@ void ll_sys_bg_temperature_measurement(void)
 
 void request_temperature_measurement(void)
 {
-	int16_t temperature_value = 0;
-	uint32_t basepri_value = __get_BASEPRI();
+	struct sensor_value val;
+	uint32_t basepri_value;
+	int rc;
 
 	LOG_SOC_DBG("");
 
+	if (!device_is_ready(dietemp_dev)) {
+		printk("Temperature sensor is not ready\n");
+		return;
+	}
+
+	/* TBD: Is that really required ? */
+	basepri_value = __get_BASEPRI();
 	__set_BASEPRI_MAX(RCC_INTR_PRIO << 4);
 
-	adc_ctrl_req(SYS_ADC_LL_EVT, ADC_ON);
-	temperature_value = adc_ctrl_request_temperature();
-	adc_ctrl_req(SYS_ADC_LL_EVT, ADC_OFF);
-	ll_intf_set_temperature_value(temperature_value);
+	/* fetch sensor samples */
+	rc = sensor_sample_fetch(dietemp_dev);
+	if (rc) {
+		printk("Failed to fetch sample (%d)\n", rc);
+	}
+
+	rc = sensor_channel_get(dietemp_dev, SENSOR_CHAN_DIE_TEMP, &val);
+	if (rc) {
+		printk("Failed to get data (%d)\n", rc);
+	}
+
+	ll_intf_set_temperature_value((uint32_t)val.val1);
 
 	__set_BASEPRI(basepri_value);
 }
@@ -108,6 +127,7 @@ void ll_sys_config_params(void)
 	ll_intf_config_ll_ctx_params(USE_RADIO_LOW_ISR, NEXT_EVENT_SCHEDULING_FROM_ISR);
 
 #if (USE_TEMPERATURE_BASED_RADIO_CALIBRATION == 1)
+
 	ll_sys_bg_temperature_measurement_init();
 	ll_intf_set_temperature_sensor_state();
 #endif /* USE_TEMPERATURE_BASED_RADIO_CALIBRATION */
