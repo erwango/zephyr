@@ -25,6 +25,12 @@ config ADC
 config SENSOR
 	default y
 
+config BT_HCI_TX_STACK_SIZE_WITH_PROMPT
+	default y
+
+config BT_HCI_TX_STACK_SIZE
+	default 4096
+
 endif
 
 endif # BOARD_NUCLEO_WBA52CG
