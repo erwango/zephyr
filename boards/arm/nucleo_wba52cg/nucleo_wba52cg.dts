@@ -22,6 +22,7 @@
 		zephyr,console = &usart1;
 		zephyr,shell-uart = &usart1;
 		zephyr,bt-c2h-uart = &lpuart1;
+		zephyr,uart-pipe = &lpuart1;
 		zephyr,sram = &sram0;
 		zephyr,flash = &flash0;
 	};
