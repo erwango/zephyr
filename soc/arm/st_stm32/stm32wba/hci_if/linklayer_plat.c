@@ -11,6 +11,8 @@
 #include <zephyr/drivers/entropy.h>
 #include <cmsis_core.h>
 
+#include <linklayer_plat_local.h>
+
 #include <stm32_ll_pwr.h>
 
 #include <zephyr/logging/log.h>
@@ -29,8 +31,10 @@ LOG_MODULE_REGISTER(link_layer_plat);
 #define RADIO_INTR_PRIO_LOW_Z (RADIO_INTR_PRIO_LOW + _IRQ_PRIO_OFFSET)
 
 /* 2.4GHz RADIO ISR callbacks */
-void *radio_callback = NULL;
-void *low_isr_callback = NULL;
+typedef void (*radio_isr_cb_t) (void);
+
+radio_isr_cb_t radio_callback;
+radio_isr_cb_t low_isr_callback;
 
 extern const struct device *rng_dev;
 
@@ -105,16 +109,6 @@ void LINKLAYER_PLAT_SetupRadioIT(void (*intr_cb)())
 	LOG_SOC_DBG("");
 
 	radio_callback = intr_cb;
-
-	ARM_IRQ_DIRECT_DYNAMIC_CONNECT(RADIO_INTR_NUM, 0, 0, reschedule);
-
-	/* Ensure the IRQ is disabled before enabling it at run time */
-	irq_disable((IRQn_Type)RADIO_INTR_NUM);
-
-	irq_connect_dynamic((IRQn_Type)RADIO_INTR_NUM, RADIO_INTR_PRIO_HIGH_Z, radio_callback, NULL,
-			    0);
-
-	irq_enable((IRQn_Type)RADIO_INTR_NUM);
 }
 
 void LINKLAYER_PLAT_SetupSwLowIT(void (*intr_cb)())
@@ -122,6 +116,49 @@ void LINKLAYER_PLAT_SetupSwLowIT(void (*intr_cb)())
 	LOG_SOC_DBG("");
 
 	low_isr_callback = intr_cb;
+}
+
+void radio_high_prio_isr(void)
+{
+	radio_callback();
+
+	HAL_RCCEx_DisableRequestUponRadioWakeUpEvent();
+
+	__ISB();
+
+	ISR_DIRECT_PM();
+}
+
+void radio_low_prio_isr(void)
+{
+	irq_disable((IRQn_Type)RADIO_SW_LOW_INTR_NUM);
+
+	low_isr_callback();
+
+	/* Check if nested SW radio low interrupt has been requested*/
+	if(radio_sw_low_isr_is_running_high_prio != 0) {
+		NVIC_SetPriority((IRQn_Type) RADIO_SW_LOW_INTR_NUM, RADIO_INTR_PRIO_LOW);
+		radio_sw_low_isr_is_running_high_prio = 0;
+	}
+
+	/* Re-enable SW radio low interrupt */
+	irq_enable((IRQn_Type)RADIO_SW_LOW_INTR_NUM);
+
+	ISR_DIRECT_PM();
+}
+
+
+void link_layer_register_isr(void) {
+
+	ARM_IRQ_DIRECT_DYNAMIC_CONNECT(RADIO_INTR_NUM, 0, 0, reschedule);
+
+	/* Ensure the IRQ is disabled before enabling it at run time */
+	irq_disable((IRQn_Type)RADIO_INTR_NUM);
+
+	irq_connect_dynamic((IRQn_Type)RADIO_INTR_NUM, RADIO_INTR_PRIO_HIGH_Z,
+			    (void (*)(const void *))radio_high_prio_isr, NULL, 0);
+
+	irq_enable((IRQn_Type)RADIO_INTR_NUM);
 
 	ARM_IRQ_DIRECT_DYNAMIC_CONNECT(RADIO_SW_LOW_INTR_NUM, 0, 0, reschedule);
 
@@ -129,10 +166,11 @@ void LINKLAYER_PLAT_SetupSwLowIT(void (*intr_cb)())
 	irq_disable((IRQn_Type)RADIO_SW_LOW_INTR_NUM);
 
 	irq_connect_dynamic((IRQn_Type)RADIO_SW_LOW_INTR_NUM, RADIO_SW_LOW_INTR_PRIO,
-			    low_isr_callback, NULL, 0);
+			    (void (*)(const void *))radio_low_prio_isr, NULL, 0);
 
 	irq_enable((IRQn_Type)RADIO_SW_LOW_INTR_NUM);
 }
+
 
 void LINKLAYER_PLAT_TriggerSwLowIT(uint8_t priority)
 {

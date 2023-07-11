@@ -14,6 +14,7 @@
 #include <zephyr/drivers/bluetooth/hci_driver.h>
 #include <zephyr/bluetooth/addr.h>
 #include <zephyr/drivers/clock_control/stm32_clock_control.h>
+#include <linklayer_plat_local.h>
 
 #include <zephyr/sys/byteorder.h>
 
@@ -368,6 +369,9 @@ static const struct bt_hci_driver drv = {
 static int bt_stm32wba_hci_init(void)
 {
 	bt_ble_ctlr_init();
+
+	link_layer_register_isr();
+
 	ll_sys_config_params();
 
 	bt_hci_driver_register(&drv);
