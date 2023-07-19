@@ -11,3 +11,23 @@ config SOC_STM32WBA52XX
 	bool "STM32WBA52XX"
 
 endchoice
+
+config STM32WBA_DBG_BLE_HS_IF
+	bool "Debug LOG for host_stack_if file"
+	help
+	  Enable LOG_DBG in for host_stack_if.c file
+
+config STM32WBA_DBG_BLE_LL_PLAT
+	bool "Debug LOG for linklayer_plat file"
+	help
+	  Enable LOG_DBG in for linklayer_plat.c file
+
+config STM32WBA_DBG_BLE_LL_SYS_IF
+	bool "Debug LOG for ll_sys_if file"
+	help
+	  Enable LOG_DBG in for ll_sys_if.c file
+
+config STM32WBA_DBG_BLE_PLAT
+	bool "Debug LOG for bleplat file"
+	help
+	  Enable LOG_DBG in for bleplat.c file
