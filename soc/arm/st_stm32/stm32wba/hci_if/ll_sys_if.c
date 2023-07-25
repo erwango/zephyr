@@ -24,7 +24,7 @@ LOG_MODULE_REGISTER(ll_sys_if);
 #include "linklayer_plat.h"
 
 extern struct k_mutex ble_ctlr_stack_mutex;
-extern struct k_work_q ble_ctlr_work_q;
+extern struct k_work_q ll_work_q;
 struct k_work ll_sys_work, ll_sys_temp_work;
 
 #if (USE_TEMPERATURE_BASED_RADIO_CALIBRATION == 1)
@@ -39,7 +39,9 @@ void ll_sys_schedule_bg_process(void)
 {
 	LOG_SOC_DBG("");
 
-	k_work_submit_to_queue(&ble_ctlr_work_q, &ll_sys_work);
+	k_work_submit_to_queue(&ll_work_q, &ll_sys_work);
+}
+
 }
 
 static void ll_sys_bg_process_handler(struct k_work *work)
@@ -69,7 +71,7 @@ void ll_sys_bg_temperature_measurement(void)
 {
 	LOG_SOC_DBG("");
 
-	k_work_submit_to_queue(&ble_ctlr_work_q, &ll_sys_temp_work);
+	k_work_submit_to_queue(&ll_work_q, &ll_sys_temp_work);
 }
 
 void request_temperature_measurement(void)

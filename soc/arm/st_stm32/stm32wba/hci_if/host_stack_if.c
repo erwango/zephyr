@@ -23,15 +23,18 @@ LOG_MODULE_REGISTER(host_stack_if);
 #endif
 
 K_MUTEX_DEFINE(ble_ctlr_stack_mutex);
-struct k_work_q ble_ctlr_work_q;
+struct k_work_q ble_ctlr_work_q, ll_work_q;
 struct k_work ble_ctlr_stack_work, bpka_work;
 
 uint8_t LLStateBusy = 0;
 
 #define BLE_CTLR_TASK_STACK_SIZE (256 * 7)
+#define LL_TASK_STACK_SIZE (256 * 7)
 #define BLE_CTLR_TASK_PRIO	 (14)
+#define LL_TASK_PRIO (14)
 
 K_THREAD_STACK_DEFINE(ble_ctlr_work_area, BLE_CTLR_TASK_STACK_SIZE);
+K_THREAD_STACK_DEFINE(ll_work_area, LL_TASK_STACK_SIZE);
 
 void HostStack_Process(void)
 {
@@ -43,7 +46,7 @@ void HostStack_Process(void)
 static void ble_ctlr_stack_handler(struct k_work *work)
 {
 	uint8_t running = 0x0;
-    change_state_options_t options;
+	change_state_options_t options;
 
 	k_mutex_lock(&ble_ctlr_stack_mutex, K_FOREVER);
 	running = BleStack_Process();
@@ -73,10 +76,14 @@ static void bpka_work_handler(struct k_work *work)
 static int stm32wba_ble_ctlr_init(void)
 {
 	k_work_queue_init(&ble_ctlr_work_q);
-
 	k_work_queue_start(&ble_ctlr_work_q, ble_ctlr_work_area,
-		K_THREAD_STACK_SIZEOF(ble_ctlr_work_area), BLE_CTLR_TASK_PRIO,
-		NULL);
+				K_THREAD_STACK_SIZEOF(ble_ctlr_work_area),
+				BLE_CTLR_TASK_PRIO, NULL);
+
+	k_work_queue_init(&ll_work_q);
+	k_work_queue_start(&ll_work_q, ll_work_area,
+				K_THREAD_STACK_SIZEOF(ll_work_area),
+				LL_TASK_PRIO, NULL);
 
 	k_work_init(&ble_ctlr_stack_work, &ble_ctlr_stack_handler);
 	k_work_init(&bpka_work, &bpka_work_handler);
