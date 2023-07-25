@@ -105,9 +105,10 @@ static int stm32_power_init(void)
 	LL_AHB4_GRP1_EnableClock(LL_AHB4_GRP1_PERIPH_PWR);
 
 #ifdef CONFIG_DEBUG
-	/* Enable the Debug Module during all and any Low power mode */
 	LL_DBGMCU_EnableDBGStopMode();
-#endif /* CONFIG_DEBUG */
+#else
+	LL_DBGMCU_DisableDBGStopMode();
+#endif
 
 	return 0;
 }
