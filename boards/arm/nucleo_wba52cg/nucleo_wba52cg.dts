@@ -21,8 +21,8 @@
 		zephyr,bt-mon-uart = &usart1;
 		zephyr,console = &usart1;
 		zephyr,shell-uart = &usart1;
-		zephyr,bt-c2h-uart = &lpuart1;
-		zephyr,uart-pipe = &lpuart1;
+		//zephyr,bt-c2h-uart = &lpuart1;
+		//zephyr,uart-pipe = &lpuart1;
 		zephyr,sram = &sram0;
 		zephyr,flash = &flash0;
 	};
@@ -93,11 +93,11 @@
 };
 
 &lpuart1 {
-       pinctrl-0 = <&lpuart1_tx_pb5 &lpuart1_rx_pa10 &lpuart1_cts_pa0 &lpuart1_rts_pb9>;
-       pinctrl-names = "default";
-       current-speed = <115200>;
-       hw-flow-control;
-       status = "okay";
+	pinctrl-0 = <&lpuart1_tx_pb5 &lpuart1_rx_pa10 &lpuart1_cts_pa0 &lpuart1_rts_pb9>;
+	pinctrl-names = "default";
+	current-speed = <115200>;
+	hw-flow-control;
+	status = "disabled";
 };
 
 &spi1 {
@@ -126,8 +126,6 @@
 	clocks = <&rcc STM32_CLOCK_BUS_APB7 0x00000800>,
 		 <&rcc STM32_SRC_LSE LPTIM1_SEL(3)>;
 	status = "okay";
-	clocks = <&rcc STM32_CLOCK_BUS_APB7 0x00000800>,
-		 <&rcc STM32_SRC_LSE LPTIM1_SEL(3)>;
 };
 
 &die_temp {
