@@ -534,6 +534,9 @@ static int entropy_stm32_rng_get_entropy(const struct device *dev,
 
 	return 0;
 }
+#ifdef CONFIG_PM_DEVICE
+static int entropy_stm32_rng_pm_action(const struct device *dev, enum pm_device_action action);
+#endif
 
 static int entropy_stm32_rng_get_entropy_isr(const struct device *dev,
 					     uint8_t *buf,
@@ -544,6 +547,9 @@ static int entropy_stm32_rng_get_entropy_isr(const struct device *dev,
 
 	/* Check if this API is called on correct driver instance. */
 	__ASSERT_NO_MSG(&entropy_stm32_rng_data == dev->data);
+
+	/* To re-enable device if request is coming in STOP mode */
+	entropy_stm32_rng_pm_action(dev, PM_DEVICE_ACTION_RESUME);
 
 	if (likely((flags & ENTROPY_BUSYWAIT) == 0U)) {
 		return rng_pool_get(
