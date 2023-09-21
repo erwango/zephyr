@@ -231,7 +231,7 @@ manifest:
       groups:
         - hal
     - name: zephyr_hal_stm32
-      revision: pull/12/head
+      revision: pull/13/head
       remote: stm32-osf
       path: modules/hal/stm32
       groups:
