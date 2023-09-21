@@ -189,7 +189,7 @@ void LINKLAYER_PLAT_TriggerSwLowIT(uint8_t priority)
 			low_isr_priority = RADIO_SW_LOW_INTR_PRIO;
 		}
 
-		HAL_NVIC_SetPriority((IRQn_Type)RADIO_SW_LOW_INTR_NUM, low_isr_priority, 0);
+		NVIC_SetPriority((IRQn_Type)RADIO_SW_LOW_INTR_NUM, low_isr_priority);
 	} else {
 		/* Nested call detected */
 		/* No change for SW radio low interrupt priority for the moment */
@@ -202,7 +202,7 @@ void LINKLAYER_PLAT_TriggerSwLowIT(uint8_t priority)
 		}
 	}
 
-	HAL_NVIC_SetPendingIRQ((IRQn_Type)RADIO_SW_LOW_INTR_NUM);
+	NVIC_SetPendingIRQ((IRQn_Type)RADIO_SW_LOW_INTR_NUM);
 }
 
 void LINKLAYER_PLAT_EnableIRQ(void)
