@@ -42,6 +42,11 @@ void ll_sys_schedule_bg_process(void)
 	k_work_submit_to_queue(&ll_work_q, &ll_sys_work);
 }
 
+void ll_sys_schedule_bg_process_isr(void)
+{
+	LOG_SOC_DBG("");
+
+	k_work_submit_to_queue(&ll_work_q, &ll_sys_work);
 }
 
 static void ll_sys_bg_process_handler(struct k_work *work)
