@@ -56,7 +56,7 @@ static void bt_ready(int err)
 
 	printk("Bluetooth initialized\n");
 
-	k_sleep(K_MSEC(500));
+	k_sleep(K_MSEC(1000));
 
 	/* Start advertising */
 	err = bt_le_adv_start(BT_LE_ADV_NCONN_IDENTITY, ad, ARRAY_SIZE(ad),
@@ -75,19 +75,19 @@ static void bt_ready(int err)
 	bt_id_get(&addr, &count);
 	bt_addr_le_to_str(&addr, addr_s, sizeof(addr_s));
 
-	printk("Beacon started, advertising as %s\n", addr_s);
+	printk("Beacon started 1, advertising as %s\n", addr_s);
 
-	k_sleep(K_SECONDS(2));
-
+	//k_sleep(K_MSEC(2000));
+#if 0
 	err = bt_le_adv_stop();
 	if (err != 0) {
 		printk("Advertising failed to stop: %d", err);
 		return;
 	}
 
-	printk("Beacon stopped\n");
+	printk("Beacon stopped 1\n");
 
-	k_sleep(K_SECONDS(1));
+	k_sleep(K_MSEC(1000));
 
 	/* Start advertising */
 	err = bt_le_adv_start(BT_LE_ADV_NCONN_IDENTITY, ad, ARRAY_SIZE(ad),
@@ -97,7 +97,8 @@ static void bt_ready(int err)
 		return;
 	}
 
-	printk("Beacon started\n");
+	printk("Beacon started 2\n");
+
 
 	err = bt_le_adv_stop();
 	if (err != 0) {
@@ -106,6 +107,7 @@ static void bt_ready(int err)
 	}
 
 	printk("Beacon stopped\n");
+#endif
 }
 
 int main(void)
@@ -122,6 +124,7 @@ int main(void)
 	/* Give time to bt_ready sequence */
 	k_sleep(K_SECONDS(6));
 
+#if 0
 	printk("BLE disable\n");
 	err = bt_disable();
 	if (err) {
@@ -148,6 +151,7 @@ int main(void)
 
 	printk("Powering off\n");
 	sys_poweroff();
+#endif
 
 	return 0;
 }
