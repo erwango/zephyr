@@ -7,20 +7,53 @@
 #include <zephyr/pm/pm.h>
 #include <soc.h>
 #include <zephyr/init.h>
+#include <zephyr/drivers/gpio.h>
 
 #include <stm32wbaxx_ll_utils.h>
 #include <stm32wbaxx_ll_bus.h>
+#include <stm32wbaxx_ll_adc.h>
 #include <stm32wbaxx_ll_cortex.h>
 #include <stm32wbaxx_ll_pwr.h>
+#include <stm32wbaxx_hal_pwr_ex.h>
+#include <stm32wbaxx_ll_icache.h>
 #include <stm32wbaxx_ll_rcc.h>
 #include <stm32wbaxx_ll_system.h>
 #include <clock_control/clock_stm32_ll_common.h>
 
+#include "scm.h"
+
 #include <zephyr/logging/log.h>
+
 LOG_MODULE_DECLARE(soc, CONFIG_SOC_LOG_LEVEL);
 
 void set_mode_stop(uint8_t substate_id)
 {
+
+	LL_PWR_ClearFlag_STOP();
+	LL_RCC_ClearResetFlags();
+
+	while (LL_RCC_HSE_IsReady() == 0) {
+	}
+
+	scm_hserdy_isr();
+
+	/* Disabling ICACHE */
+	LL_ICACHE_Disable();
+
+	/* Wait until ICACHE_SR.BUSYF is cleared */
+	while(LL_ICACHE_IsActiveFlag_BUSY() == 1U);
+
+	/* Wait until ICACHE_SR.BSYENDF is set */
+	while(LL_ICACHE_IsActiveFlag_BSYEND() == 0U);
+
+	scm_setwaitstates(LP);
+
+	LL_LPM_EnableDeepSleep();
+
+	while(LL_PWR_IsActiveFlag_ACTVOS( ) == 0) {
+	}
+	// AM: Here we must be sure to have RADIO in idle and RNG and ADC completely off
+	// to reach power target value of about 30 uA
 	switch (substate_id) {
 	case 1: /* enter STOP0 mode */
 		LL_PWR_SetPowerMode(LL_PWR_MODE_STOP0);
@@ -67,11 +100,21 @@ void pm_state_set(enum pm_state state, uint8_t substate_id)
 /* Handle SOC specific activity after Low Power Mode Exit */
 void pm_state_exit_post_ops(enum pm_state state, uint8_t substate_id)
 {
+
+	LL_ICACHE_Enable();
+	while(LL_ICACHE_IsEnabled() == 0U);
+
+	if (LL_PWR_IsActiveFlag_STOP() == 1U) {
+		scm_setup();
+	} else {
+		scm_setwaitstates(RUN);
+	}
+
 	switch (state) {
 	case PM_STATE_SUSPEND_TO_IDLE:
 		if (substate_id <= 2) {
-			LL_LPM_DisableSleepOnExit();
-			LL_LPM_EnableSleep();
+			//LL_LPM_DisableSleepOnExit();
+			//LL_LPM_EnableSleep();
 		} else {
 			LOG_DBG("Unsupported power substate-id %u",
 							substate_id);
@@ -88,7 +131,7 @@ void pm_state_exit_post_ops(enum pm_state state, uint8_t substate_id)
 		break;
 	}
 	/* need to restore the clock */
-	stm32_clock_control_init(NULL);
+	//stm32_clock_control_init(NULL);
 
 	/*
 	 * System is now in active mode.
@@ -101,6 +144,12 @@ void pm_state_exit_post_ops(enum pm_state state, uint8_t substate_id)
 /* Initialize STM32 Power */
 static int stm32_power_init(void)
 {
+
+#if CONFIG_BT_STM32WBA
+	LL_PWR_SetRegulVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE2);
+	scm_init();
+#endif
+
 	/* enable Power clock */
 	LL_AHB4_GRP1_EnableClock(LL_AHB4_GRP1_PERIPH_PWR);
 
@@ -108,7 +157,14 @@ static int stm32_power_init(void)
 	LL_DBGMCU_EnableDBGStopMode();
 #else
 	LL_DBGMCU_DisableDBGStopMode();
+	LL_DBGMCU_DisableDBGStandbyMode();
 #endif
+
+	// AM: Enabling  Ultra Low power mode
+	LL_PWR_EnableUltraLowPowerMode();
+
+	// AM: Enable the FLASH power down during Low-Power sleep mode
+	__HAL_FLASH_SLEEP_POWERDOWN_ENABLE();
 
 	return 0;
 }

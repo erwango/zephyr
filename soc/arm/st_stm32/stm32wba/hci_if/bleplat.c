@@ -98,20 +98,9 @@ int8_t ble_memcmp(const void *a, const void *b, uint16_t n)
 	return (int8_t)memcmp(a, b, (size_t)n);
 }
 
-ll_sys_status_t ll_sys_dp_slp_exit(void)
-{
-	return 0;
-}
-
-ll_sys_status_t ll_sys_dp_slp_init(void)
-{
-	return 0;
-}
-
 void Error_Handler(void) {
 	LOG_ERR("");
 }
 
-void scm_notifyradiostate(void) {}
 void HW_RNG_DisableClock(uint8_t) {}
 void HW_RNG_EnableClock(uint8_t) {}
