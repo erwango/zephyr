@@ -74,6 +74,7 @@ void ll_sys_bg_temperature_measurement(void)
 
 void request_temperature_measurement(void)
 {
+#if 0
 	struct sensor_value val;
 	uint32_t basepri_value;
 	int rc;
@@ -103,6 +104,7 @@ void request_temperature_measurement(void)
 	ll_intf_set_temperature_value((uint32_t)val.val1);
 
 	__set_BASEPRI(basepri_value);
+#endif
 }
 
 static void request_temperature_measurement_handler(struct k_work *work)
