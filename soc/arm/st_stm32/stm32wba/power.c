@@ -7,14 +7,9 @@
 #include <zephyr/pm/pm.h>
 #include <soc.h>
 #include <zephyr/init.h>
-#include <zephyr/drivers/gpio.h>
 
-#include <stm32wbaxx_ll_utils.h>
 #include <stm32wbaxx_ll_bus.h>
-#include <stm32wbaxx_ll_adc.h>
-#include <stm32wbaxx_ll_cortex.h>
 #include <stm32wbaxx_ll_pwr.h>
-#include <stm32wbaxx_hal_pwr_ex.h>
 #include <stm32wbaxx_ll_icache.h>
 #include <stm32wbaxx_ll_rcc.h>
 #include <stm32wbaxx_ll_system.h>
@@ -32,9 +27,11 @@ void set_mode_stop(uint8_t substate_id)
 	LL_PWR_ClearFlag_STOP();
 	LL_RCC_ClearResetFlags();
 
-	while (LL_RCC_HSE_IsReady() == 0) {
-	}
+	// EGO: HSE is ready at this point
+	//while (LL_RCC_HSE_IsReady() == 0) {
+	//}
 
+	// EGO: No switch from HSI to HSE at this point
 	scm_hserdy_isr();
 
 	/* Disabling ICACHE */
@@ -46,9 +43,11 @@ void set_mode_stop(uint8_t substate_id)
 	/* Wait until ICACHE_SR.BSYENDF is set */
 	while(LL_ICACHE_IsActiveFlag_BSYEND() == 0U);
 
+#ifdef CONFIG_BT_STM32WBA
 	scm_setwaitstates(LP);
-
-	LL_LPM_EnableDeepSleep();
+#endif
+	// EGO: Done in pm_state_set
+	//LL_LPM_EnableDeepSleep();
 
 	while(LL_PWR_IsActiveFlag_ACTVOS( ) == 0) {
 	}
@@ -104,17 +103,20 @@ void pm_state_exit_post_ops(enum pm_state state, uint8_t substate_id)
 	LL_ICACHE_Enable();
 	while(LL_ICACHE_IsEnabled() == 0U);
 
+#ifdef CONFIG_BT_STM32WBA
 	if (LL_PWR_IsActiveFlag_STOP() == 1U) {
 		scm_setup();
 	} else {
 		scm_setwaitstates(RUN);
 	}
+#endif
 
 	switch (state) {
 	case PM_STATE_SUSPEND_TO_IDLE:
 		if (substate_id <= 2) {
-			//LL_LPM_DisableSleepOnExit();
-			//LL_LPM_EnableSleep();
+			// EGO: Why removing ?
+			LL_LPM_DisableSleepOnExit();
+			LL_LPM_EnableSleep();
 		} else {
 			LOG_DBG("Unsupported power substate-id %u",
 							substate_id);
@@ -130,8 +132,10 @@ void pm_state_exit_post_ops(enum pm_state state, uint8_t substate_id)
 		LOG_DBG("Unsupported power state %u", state);
 		break;
 	}
+#if !defined(CONFIG_BT_STM32WBA)
 	/* need to restore the clock */
-	//stm32_clock_control_init(NULL);
+	stm32_clock_control_init(NULL);
+#endif
 
 	/*
 	 * System is now in active mode.
@@ -145,8 +149,8 @@ void pm_state_exit_post_ops(enum pm_state state, uint8_t substate_id)
 static int stm32_power_init(void)
 {
 
-#if CONFIG_BT_STM32WBA
-	LL_PWR_SetRegulVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE2);
+#ifdef CONFIG_BT_STM32WBA
+	// LL_PWR_SetRegulVoltageScaling(PWR_REGULATOR_VOLTAGE_SCALE2);
 	scm_init();
 #endif
 
