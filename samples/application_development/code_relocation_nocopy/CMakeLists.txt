@@ -15,4 +15,4 @@ zephyr_code_relocate(FILES src/ext_code.c LOCATION EXTFLASH_TEXT NOCOPY)
 zephyr_code_relocate(FILES src/ext_code.c LOCATION RAM_DATA)
 
 # sram_code instead runs entirely from SRAM after being copied there.
-zephyr_code_relocate(FILES src/sram_code.c LOCATION RAM)
+zephyr_code_relocate(FILES src/sram_code.c LOCATION SRAM3)
