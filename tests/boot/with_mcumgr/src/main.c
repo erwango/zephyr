@@ -10,5 +10,7 @@
 int main(void)
 {
 	printk("Launching primary slot application on %s\n", CONFIG_BOARD);
+	printk("Build time: " __DATE__ " " __TIME__"\n");
+
 	return 0;
 }
