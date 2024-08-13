@@ -41,6 +41,8 @@ class STM32CubeProgrammerBinaryRunner(ZephyrBinaryRunner):
         tool_opt: List[str],
     ) -> None:
         super().__init__(cfg)
+        self.hex_name = cfg.hex_file
+        self.bin_name = cfg.bin_file
 
         self._port = port
         self._frequency = frequency
@@ -213,6 +215,13 @@ class STM32CubeProgrammerBinaryRunner(ZephyrBinaryRunner):
             self.check_call(cmd + ["--erase", "all"])
 
         # flash image and run application
+        if self._use_elf:
+            dl_file = self.cfg.elf_file
+        elif "signed" in self.bin_name and os.path.isfile(self.bin_name):
+            dl_file = self.bin_name
+        elif self.hex_name is not None and os.path.isfile(self.hex_name):
+            # --user-elf not used and no bin file given, default to hex
+            dl_file = self.hex_name
         dl_file = self.cfg.elf_file if self._use_elf else self.cfg.hex_file
         if dl_file is None:
             raise RuntimeError('cannot flash; no download file was specified')

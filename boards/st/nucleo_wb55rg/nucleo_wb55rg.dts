@@ -17,6 +17,7 @@
 	chosen {
 		zephyr,console = &usart1;
 		zephyr,shell-uart = &usart1;
+		zephyr,uart-mcumgr = &usart1;
 		zephyr,bt-mon-uart = &lpuart1;
 		zephyr,bt-c2h-uart = &lpuart1;
 		zephyr,sram = &sram0;
@@ -229,15 +230,29 @@ zephyr_udc0: &usb {
 		};
 		slot0_partition: partition@c000 {
 			label = "image-0";
-			reg = <0x0000c000 DT_SIZE_K(400)>;
+			reg = <0x0000c000 DT_SIZE_K(300)>;
 		};
-		slot1_partition: partition@70000 {
+		slot1_partition: partition@57000 {
 			label = "image-1";
-			reg = <0x00070000 DT_SIZE_K(400)>;
+			reg = <0x00057000 DT_SIZE_K(300)>;
 		};
-		storage_partition: partition@d8000 {
+		/* Slot partition that will be used for BLE stack */
+		slot2_partition: partition@A2000 {
+			label = "image-2";
+			reg = <0x000A2000 DT_SIZE_K(200)>;
+		};
+		/* Dummy partition required by MCUBoot */
+		slot3_partition: partition@A6000 {
+			label = "image-3";
+			reg = <0x000A2000 DT_SIZE_K(200)>;
+		};
+		/* scratch_partition: partition@d4000 {
+			label = "image-scratch";
+			reg = <0x000d4000 DT_SIZE_K(16)>;
+		}; */
+		storage_partition: partition@d4000 {
 			label = "storage";
-			reg = <0x000d8000 DT_SIZE_K(8)>;
+			reg = <0x000d4000 DT_SIZE_K(8)>;
 		};
 
 	};
