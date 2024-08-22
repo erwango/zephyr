@@ -863,7 +863,8 @@ Missing SoC names or CONFIG_SOC vs soc.yml out of sync:
                 sym_name = sym_name[7:]  # Strip CONFIG_
                 if sym_name not in defined_syms and \
                    sym_name not in self.UNDEF_KCONFIG_ALLOWLIST and \
-                   not (sym_name.endswith("_MODULE") and sym_name[:-7] in defined_syms):
+                   not (sym_name.endswith("_MODULE") and sym_name[:-7] in defined_syms) and \
+                   not (sym_name.endswith("_MODULE_BLOBS") and sym_name[:-13] in defined_syms):
 
                     undef_to_locs[sym_name].append(f"{path}:{lineno}")
 
