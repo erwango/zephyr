@@ -1,0 +1,8 @@
+# Copyright (c) 2024 Silicon Laboratories Inc.
+# SPDX-License-Identifier: Apache-2.0
+
+config ZEPHYR_HAL_ESPRESSIF_MODULE
+	bool
+
+config ZEPHYR_HAL_ESPRESSIF_MODULE_BLOBS
+	bool
