@@ -71,9 +71,11 @@ static const struct stm32_pclken pclken[] = STM32_DT_INST_CLOCKS(0);
 #define USB_MAXIMUM_SPEED	DT_INST_PROP(0, maximum_speed)
 #endif
 
+#if !DT_HAS_COMPAT_STATUS_OKAY(st_stm32n6_otghs)
 PINCTRL_DT_INST_DEFINE(0);
 static const struct pinctrl_dev_config *usb_pcfg =
 					PINCTRL_DT_INST_DEV_CONFIG_GET(0);
+#endif
 
 #define USB_OTG_HS_EMB_PHY (DT_HAS_COMPAT_STATUS_OKAY(st_stm32_usbphyc) && \
 			    DT_HAS_COMPAT_STATUS_OKAY(st_stm32_otghs))
@@ -118,6 +120,10 @@ static const struct gpio_dt_spec ulpi_reset =
 #define USB_OTG_SPEED_HIGH                     0U
 #define USB_OTG_SPEED_HIGH_IN_FULL             1U
 #endif /* CONFIG_SOC_SERIES_STM32L4X */
+
+#if defined(CONFIG_SOC_SERIES_STM32N6X)
+#define USB_USBPHYC_CR_FSEL_24MHZ USB_USBPHYC_CR_FSEL_1
+#endif
 
 #define EP0_MPS USB_OTG_MAX_EP0_SIZE
 
@@ -324,6 +330,14 @@ static int usb_dc_stm32_phy_specific_clock_enable(const struct device *const clk
 	 * with LL_PWR_EnableVDDUSB function (higher case)
 	 */
 	LL_PWR_EnableVDDUSB();
+#elif defined(CONFIG_SOC_SERIES_STM32N6X)
+	/* Enable Vdd USB voltage monitoring */
+	LL_PWR_EnableVddUSBMonitoring();
+	while (__HAL_PWR_GET_FLAG(PWR_FLAG_USB33RDY)) {
+		/* Wait for VDD33USB ready */
+	}
+	/* Enable VDDUSB */
+	LL_PWR_EnableVddUSB();
 #endif
 
 	if (DT_INST_NUM_CLOCKS(0) > 1) {
@@ -402,12 +416,26 @@ static int usb_dc_stm32_clock_enable(void)
 	/* Both OTG HS and USBPHY sleep clock MUST be disabled here at the same time */
 	LL_AHB2_GRP1_DisableClockStopSleep(LL_AHB2_GRP1_PERIPH_OTG_HS ||
 						LL_AHB2_GRP1_PERIPH_USBPHY);
-#else
+#elif !defined(CONFIG_SOC_SERIES_STM32N6X)
 	LL_AHB1_GRP1_DisableClockLowPower(LL_AHB1_GRP1_PERIPH_OTGHSULPI);
 #endif
 
 #if USB_OTG_HS_EMB_PHY
+#if defined(CONFIG_SOC_SERIES_STM32N6X)
+	/* Reset specific configuration bits before setting new values */
+	USB1_HS_PHYC->USBPHYC_CR &= ~USB_USBPHYC_CR_FSEL_Msk;
+
+	/* Configure the USB PHY Control Register to operate in the High frequency "24 MHz"
+	 * by setting the Frequency Selection (FSEL) bits 4 and 5 to 10,
+	 * which ensures proper communication.
+	 */
+	USB1_HS_PHYC->USBPHYC_CR |= USB_USBPHYC_CR_FSEL_24MHZ;
+
+	/* Peripheral OTGPHY clock enable */
+	LL_AHB5_GRP1_EnableClock(LL_AHB5_GRP1_PERIPH_OTGPHY1);
+#else
 	LL_APB2_GRP1_EnableClock(LL_APB2_GRP1_PERIPH_OTGPHYC);
+#endif
 #endif
 #endif /* USB_OTG_HS_ULPI_PHY */
 
@@ -424,12 +452,14 @@ static int usb_dc_stm32_clock_disable(void)
 	}
 #if DT_HAS_COMPAT_STATUS_OKAY(st_stm32u5_otghs_phy)
 	clock_control_off(clk, (clock_control_subsys_t)&phy_pclken[0]);
+#elif defined(CONFIG_SOC_SERIES_STM32N6X)
+	LL_AHB5_GRP1_DisableClock(LL_AHB5_GRP1_PERIPH_OTGPHY1);
 #endif
 
 	return 0;
 }
 
-#if defined(USB_OTG_FS) || defined(USB_OTG_HS)
+#if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_otgfs) || DT_HAS_COMPAT_STATUS_OKAY(st_stm32_otghs)
 static uint32_t usb_dc_stm32_get_maximum_speed(void)
 {
 	/*
@@ -481,11 +511,7 @@ static int usb_dc_stm32_init(void)
 	usb_dc_stm32_state.pcd.Init.ep0_mps = PCD_EP0MPS_64;
 	usb_dc_stm32_state.pcd.Init.low_power_enable = 0;
 #else /* USB_OTG_FS || USB_OTG_HS */
-#if DT_HAS_COMPAT_STATUS_OKAY(st_stm32_otghs)
-	usb_dc_stm32_state.pcd.Instance = USB_OTG_HS;
-#else
-	usb_dc_stm32_state.pcd.Instance = USB_OTG_FS;
-#endif
+	usb_dc_stm32_state.pcd.Instance = (USB_OTG_GlobalTypeDef *)USB_BASE_ADDRESS;
 	usb_dc_stm32_state.pcd.Init.dev_endpoints = USB_NUM_BIDIR_ENDPOINTS;
 	usb_dc_stm32_state.pcd.Init.speed = usb_dc_stm32_get_maximum_speed();
 #if USB_OTG_HS_EMB_PHY
@@ -529,12 +555,14 @@ static int usb_dc_stm32_init(void)
 	}
 #endif
 
+#if !DT_HAS_COMPAT_STATUS_OKAY(st_stm32n6_otghs)
 	LOG_DBG("Pinctrl signals configuration");
 	ret = pinctrl_apply_state(usb_pcfg, PINCTRL_STATE_DEFAULT);
 	if (ret < 0) {
 		LOG_ERR("USB pinctrl setup failed (%d)", ret);
 		return ret;
 	}
+#endif
 
 	LOG_DBG("HAL_PCD_Init");
 	status = HAL_PCD_Init(&usb_dc_stm32_state.pcd);
