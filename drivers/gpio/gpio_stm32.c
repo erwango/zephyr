@@ -353,7 +353,7 @@ static int gpio_stm32_clock_request(const struct device *dev, bool on)
 	int ret;
 
 	__ASSERT_NO_MSG(dev != NULL);
-
+	Test
 	/* enable clock for subsystem */
 	const struct device *const clk = DEVICE_DT_GET(STM32_CLOCK_CONTROL_NODE);
 
