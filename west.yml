@@ -23,6 +23,8 @@ manifest:
       url-base: https://github.com/zephyrproject-rtos
     - name: babblesim
       url-base: https://github.com/BabbleSim
+    - name: erwango
+      url-base: https://github.com/erwango
 
   group-filter: [-babblesim, -optional]
 
@@ -321,7 +323,8 @@ manifest:
       groups:
         - crypto
     - name: mcuboot
-      revision: 96576b341ee19f1c3af6622256b0d4f3d408e1e3
+      remote: erwango
+      revision: f4bbc960f8b2bb3d4408d6407d1c2eadbe95dff1
       path: bootloader/mcuboot
       groups:
         - bootloader
