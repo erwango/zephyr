@@ -1,0 +1,232 @@
+name: Black Duck scan
+on:
+  issue_comment:
+    types:
+      - created
+jobs:
+  build:
+    if: >-
+      github.event.issue.pull_request &&
+      startsWith(github.event.comment.body, '/license-scan')
+    runs-on: ubuntu22-basic
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: write
+    steps:
+      - name: Acknowledge /license-scan command
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const runUrl = `${context.serverUrl}/${context.repo.owner}/${context.repo.repo}/actions/runs/${context.runId}`;
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: `License scan requested. Workflow run: ${runUrl}`,
+            });
+
+      - name: Resolve PR metadata
+        id: pr_metadata
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const {owner, repo} = context.repo;
+            const pull_number = context.payload.issue.number;
+            const {data: pullRequest} = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number,
+            });
+
+            core.setOutput('base_sha', pullRequest.base.sha);
+            core.setOutput('head_sha', pullRequest.head.sha);
+
+      - name: Checkout sources
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.pr_metadata.outputs.head_sha }}
+          fetch-depth: 0
+
+      - name: Prepare PR-only scan scope
+        id: prepare_pr_scope
+        env:
+          PR_BASE_SHA: ${{ steps.pr_metadata.outputs.base_sha }}
+          PR_HEAD_SHA: ${{ steps.pr_metadata.outputs.head_sha }}
+        run: |
+          set -eu
+
+          scope_dir="$RUNNER_TEMP/blackduck-pr-scope"
+          changed_files_list="$RUNNER_TEMP/blackduck-pr-files.txt"
+
+          rm -rf "$scope_dir"
+          mkdir -p "$scope_dir"
+
+          if ! git cat-file -e "$PR_BASE_SHA^{commit}" 2>/dev/null; then
+            git fetch --no-tags --depth=1 origin "$PR_BASE_SHA"
+          fi
+
+          merge_base_sha="$(git merge-base "$PR_BASE_SHA" "$PR_HEAD_SHA")"
+          git diff --name-only --diff-filter=ACMR -z "$merge_base_sha" "$PR_HEAD_SHA" > "$changed_files_list"
+
+          if [[ ! -s "$changed_files_list" ]]; then
+            echo "has_files=false" >> "$GITHUB_OUTPUT"
+            echo "scope_dir=$scope_dir" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          while IFS= read -r -d '' file_path; do
+            if [[ -e "$file_path" ]]; then
+              mkdir -p "$scope_dir/$(dirname "$file_path")"
+              cp -a -- "$file_path" "$scope_dir/$file_path"
+            fi
+          done < "$changed_files_list"
+
+          echo "has_files=true" >> "$GITHUB_OUTPUT"
+          echo "scope_dir=$scope_dir" >> "$GITHUB_OUTPUT"
+
+      - name: BlackDuck PR-only license scan
+        if: ${{ steps.prepare_pr_scope.outputs.has_files == 'true' }}
+        uses: blackduck-inc/black-duck-security-scan@v2.6.0
+        ### Use below configuration to set specific detect environment variables
+        env:
+          NO_PROXY: 'blackduck.st.com, github.st.com'
+          DETECT_PROJECT_NAME: ${{ vars.BLACKDUCK_PROJECT_NAME }}
+          DETECT_PROJECT_VERSION_NAME: pr-${{ github.event.issue.number }}
+        with:
+          blackducksca_url: ${{ vars.BLACKDUCK_URL }}
+          blackducksca_token: ${{ secrets.BLACKDUCK_API_TOKEN }}
+          project_directory: ${{ steps.prepare_pr_scope.outputs.scope_dir }}
+          blackducksca_scan_full: true
+          include_diagnostics: true
+          ### Uncomment below configuration to enable automatic fix pull request creation
+          # blackducksca_fixpr_enabled: true
+          # blackducksca_fixpr_maxCount: 5
+          # blackducksca_fixpr_filter_severities: 'CRITICAL,HIGH'
+          blackducksca_fixpr_useUpgradeGuidance: 'SHORT_TERM,LONG_TERM'
+          detect_args: >-
+            --detect.excluded.detector.types=GIT
+            --detect.blackduck.signature.scanner.snippet.matching=SNIPPET_MATCHING
+            --detect.blackduck.signature.scanner.copyright.search=true
+            --detect.blackduck.signature.scanner.license.search=true
+            --detect.blackduck.signature.scanner.upload.source.mode=true
+            --detect.timeout=30000
+
+      - name: Prepare Black Duck result comment
+        id: blackduck_result
+        if: ${{ steps.prepare_pr_scope.outputs.has_files == 'true' }}
+        env:
+          BLACKDUCK_URL: ${{ vars.BLACKDUCK_URL }}
+          BLACKDUCK_API_TOKEN: ${{ secrets.BLACKDUCK_API_TOKEN }}
+          BLACKDUCK_PROJECT_NAME: ${{ vars.BLACKDUCK_PROJECT_NAME }}
+          BLACKDUCK_VERSION_NAME: pr-${{ github.event.issue.number }}
+        run: |
+          set -eu
+
+          /usr/bin/env python3 <<'PY'
+          import os
+          import urllib.parse
+          import urllib.request
+
+
+          def api_get_json(api_url: str, token: str):
+            req = urllib.request.Request(
+              api_url,
+              headers={
+                "Authorization": f"token {token}",
+                "Accept": "application/json",
+              },
+            )
+            with urllib.request.urlopen(req) as response:
+              return response.read().decode("utf-8")
+
+
+          def load_json(api_url: str, token: str):
+            import json
+
+            return json.loads(api_get_json(api_url, token))
+
+
+          def extract_id_from_href(href: str):
+            return href.rstrip("/").split("/")[-1]
+
+
+          def find_project(base_url: str, token: str, project_name: str):
+            q = urllib.parse.quote(f"name:{project_name}", safe="")
+            url = f"{base_url}/api/projects?limit=100&offset=0&q={q}"
+            data = load_json(url, token)
+            for item in data.get("items", []):
+              if item.get("name") == project_name:
+                href = item.get("_meta", {}).get("href", "")
+                if href:
+                  return extract_id_from_href(href)
+            return None
+
+
+          def find_version(base_url: str, token: str, project_id: str, version_name: str):
+            version_filters = [f"versionName:{version_name}", f"name:{version_name}"]
+            for version_filter in version_filters:
+              q = urllib.parse.quote(version_filter, safe="")
+              url = (
+                f"{base_url}/api/projects/{project_id}/versions"
+                f"?limit=100&offset=0&q={q}"
+              )
+              data = load_json(url, token)
+              for item in data.get("items", []):
+                item_name = item.get("versionName") or item.get("name")
+                if item_name == version_name:
+                  href = item.get("_meta", {}).get("href", "")
+                  if href:
+                    return extract_id_from_href(href)
+            return None
+
+          base_url = os.environ["BLACKDUCK_URL"].rstrip("/")
+          token = os.environ.get("BLACKDUCK_API_TOKEN", "")
+          project_name = os.environ["BLACKDUCK_PROJECT_NAME"]
+          version_name = os.environ["BLACKDUCK_VERSION_NAME"]
+          github_output = os.environ["GITHUB_OUTPUT"]
+          backup_url = "https://blackduck.st.com/api/projects/1013c9d2-78da-4764-9981-36f696dad3cb/versions?limit=100&offset=0"
+          result_url = backup_url
+
+          if token:
+            try:
+              project_id = find_project(base_url, token, project_name)
+              if project_id:
+                version_id = find_version(base_url, token, project_id, version_name)
+                if version_id:
+                  result_url = (
+                    f"{base_url}/ui/projects/{project_id}/versions/"
+                    f"{version_id}/components"
+                  )
+            except Exception:
+              result_url = backup_url
+
+          comment_body = (
+              f"Black Duck result stored in project '{project_name}', version '{version_name}'. "
+              f"Open: [Black Duck results]({result_url})"
+          )
+
+          with open(github_output, "a", encoding="utf-8") as output:
+              output.write(f"result_url={result_url}\n")
+              output.write(f"backup_url={backup_url}\n")
+              output.write("comment_body<<EOF\n")
+              output.write(comment_body + "\n")
+              output.write("EOF\n")
+          PY
+
+      - name: Comment Black Duck result link
+        if: ${{ steps.blackduck_result.outputs.comment_body != '' }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: `${{ steps.blackduck_result.outputs.comment_body }}`,
+            });
+
+      - name: Skip PR-only license scan
+        if: ${{ steps.prepare_pr_scope.outputs.has_files != 'true' }}
+        run: |
+          echo "No added or modified files were found in the PR diff. Skipping Black Duck scan."
