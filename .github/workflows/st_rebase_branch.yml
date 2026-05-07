@@ -1,0 +1,83 @@
+# SPDX-FileCopyrightText: Copyright The Zephyr Project Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+name: Rebase dev/genai branch on upstream main
+
+on:
+  schedule:
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: st-rebase-dev-genai
+  cancel-in-progress: false
+
+jobs:
+  rebase:
+    runs-on: ubuntu22-basic
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.REBASE_PUSH_TOKEN }}
+
+      - name: Rebase branches on upstream main
+        env:
+          REBASE_PUSH_TOKEN: ${{ secrets.REBASE_PUSH_TOKEN }}
+          GIT_EDITOR: true
+          EDITOR: true
+          VISUAL: true
+        run: |
+          set -eu
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git remote add upstream https://github.com/zephyrproject-rtos/zephyr.git
+          git fetch --no-tags upstream main
+
+          if [ -z "${REBASE_PUSH_TOKEN:-}" ]; then
+            echo "Set REBASE_PUSH_TOKEN for this workflow." >&2
+            exit 1
+          fi
+
+          target_branch="dev/genai"
+          git fetch --no-tags origin "$target_branch"
+          git checkout -B "$target_branch" "origin/$target_branch"
+
+          if ! git rebase -X ours upstream/main; then
+            while [ -d .git/rebase-merge ] || [ -d .git/rebase-apply ]; do
+              conflicted_files="$(git diff --name-only --diff-filter=U || true)"
+
+              if [ -n "$conflicted_files" ]; then
+                echo "$conflicted_files" | while IFS= read -r conflicted_file; do
+                  if [ -n "$conflicted_file" ]; then
+                    git rm -f -- "$conflicted_file"
+                  fi
+                done
+              fi
+
+              if git rebase --continue; then
+                continue
+              fi
+
+              conflicted_files="$(git diff --name-only --diff-filter=U || true)"
+              if [ -n "$conflicted_files" ]; then
+                continue
+              fi
+
+              if [ -z "$(git status --porcelain)" ]; then
+                git rebase --skip
+                continue
+              fi
+
+              echo "Unable to auto-resolve rebase conflict." >&2
+              git status --short
+              exit 1
+            done
+          fi
+
+          git push --force-with-lease origin HEAD:"$target_branch"

@@ -1,0 +1,46 @@
+# SPDX-FileCopyrightText: Copyright The Zephyr Project Contributors
+# SPDX-License-Identifier: Apache-2.0
+
+name: Update STM32-OSF main from upstream main
+
+on:
+  schedule:
+    - cron: '15 0 * * *'
+  workflow_dispatch:
+
+concurrency:
+  group: st-rebase-main-zephyr-osf
+  cancel-in-progress: false
+
+jobs:
+  rebase:
+    runs-on: ubuntu22-basic
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.REBASE_PUSH_TOKEN }}
+
+      - name: Update STM32-OSF main from upstream main
+        env:
+          REBASE_PUSH_TOKEN: ${{ secrets.REBASE_PUSH_TOKEN }}
+        run: |
+          set -eu
+
+          git remote add upstream https://github.com/zephyrproject-rtos/zephyr.git
+          git remote add stm32-osf https://github.st.com/STM32-OSF/zephyr.git
+          git fetch --no-tags upstream main
+          git fetch --no-tags stm32-osf main
+
+          if [ -z "${REBASE_PUSH_TOKEN:-}" ]; then
+            echo "Set REBASE_PUSH_TOKEN for this workflow." >&2
+            exit 1
+          fi
+
+          target_branch="main"
+          git checkout -B "$target_branch" "stm32-osf/$target_branch"
+          git reset --hard upstream/main
+          git push --force-with-lease stm32-osf HEAD:"$target_branch"
