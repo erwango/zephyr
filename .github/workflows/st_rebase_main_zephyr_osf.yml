@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright The Zephyr Project Contributors
 # SPDX-License-Identifier: Apache-2.0
 
-name: Update STM32-OSF main from upstream main
+name: Update STM32-OSF mirrors from upstream
 
 on:
   schedule:
@@ -24,7 +24,7 @@ jobs:
           fetch-depth: 0
           token: ${{ secrets.REBASE_PUSH_TOKEN }}
 
-      - name: Update STM32-OSF main from upstream main
+      - name: Update STM32-OSF repositories from upstream
         env:
           REBASE_PUSH_TOKEN: ${{ secrets.REBASE_PUSH_TOKEN }}
         run: |
@@ -32,8 +32,12 @@ jobs:
 
           git remote add upstream https://github.com/zephyrproject-rtos/zephyr.git
           git remote add stm32-osf https://github.st.com/STM32-OSF/zephyr.git
+          git remote add upstream-hal-stm32 https://github.com/zephyrproject-rtos/hal_stm32.git
+          git remote add stm32-osf-hal-stm32 https://github.st.com/STM32-OSF/hal_stm32.git
           git fetch --no-tags upstream main
           git fetch --no-tags stm32-osf main
+          git fetch --no-tags upstream-hal-stm32 main
+          git fetch --no-tags stm32-osf-hal-stm32 main
 
           if [ -z "${REBASE_PUSH_TOKEN:-}" ]; then
             echo "Set REBASE_PUSH_TOKEN for this workflow." >&2
@@ -41,6 +45,13 @@ jobs:
           fi
 
           target_branch="main"
+
+          # Rebase STM32-OSF zephyr main from upstream zephyr main.
           git checkout -B "$target_branch" "stm32-osf/$target_branch"
           git reset --hard upstream/main
           git push --force-with-lease stm32-osf HEAD:"$target_branch"
+
+          # Rebase STM32-OSF hal_stm32 main from upstream hal_stm32 main.
+          git checkout -B "$target_branch" "stm32-osf-hal-stm32/$target_branch"
+          git reset --hard upstream-hal-stm32/main
+          git push --force-with-lease stm32-osf-hal-stm32 HEAD:"$target_branch"
