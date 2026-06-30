@@ -4,6 +4,7 @@
 
 import logging
 import os
+import pathlib
 import re
 from dataclasses import dataclass
 
@@ -159,30 +160,60 @@ def normalize_expression(lics_concluded):
     return " AND ".join(revised)
 
 
-def get_copyright_info(file_path):
+def _find_vcs_root(file_path):
     """
-    Scans the specified file for copyright information using REUSE tools.
+    Walk up from file_path to find the nearest VCS root (directory containing
+    .git or .hg).  Falls back to the file's immediate parent so that the
+    caller always gets a usable directory.
+    """
+    p = pathlib.Path(file_path).parent.resolve()
+    while p != p.parent:
+        if (p / '.git').exists() or (p / '.hg').exists():
+            return p
+        p = p.parent
+    return pathlib.Path(file_path).parent.resolve()
+
+
+def get_reuse_info(file_path):
+    """
+    Retrieve SPDX license expressions and copyright notices for a file using
+    the REUSE library.  The project root is resolved to the nearest VCS root
+    so that REUSE.toml bulk-annotation files located at the repository root
+    are found even when the file lives in a deeply-nested subdirectory.
 
     Arguments:
         - file_path: path to file to scan
 
-    Returns: list of copyright statements if found; empty list if not found
+    Returns: (list of license expression strings, list of copyright strings)
     """
-    _logger.debug("  - getting copyright info for %s", file_path)
+    _logger.debug("  - getting REUSE info for %s", file_path)
 
     try:
-        project = Project(os.path.dirname(file_path))
+        root = _find_vcs_root(file_path)
+        project = Project.from_directory(str(root))
         infos = project.reuse_info_of(file_path)
+        licenses = []
         copyrights = []
 
         for info in infos:
+            for expr in info.spdx_expressions:
+                licenses.append(str(expr))
             for notice in info.copyright_notices:
-                copyrights.extend([notice.original])
+                copyrights.append(notice.original)
 
-        return copyrights
+        return licenses, copyrights
     except Exception:
-        _logger.warning("Error getting copyright info for %s", file_path, exc_info=True)
-        return []
+        _logger.warning("Error getting REUSE info for %s", file_path, exc_info=True)
+        return [], []
+
+
+def get_copyright_info(file_path):
+    """
+    Deprecated: use get_reuse_info() which also returns license expressions.
+    Kept for backward compatibility.
+    """
+    _, copyrights = get_reuse_info(file_path)
+    return copyrights
 
 
 def scan_sbom_graph(cfg, sbom_graph):
@@ -216,12 +247,26 @@ def scan_sbom_graph(cfg, sbom_graph):
 
             # get licenses for file
             expression = get_expression_data(f.path, cfg.num_lines_scanned)
+            reuse_licenses, copyrights = get_reuse_info(f.path)
+
             if expression:
+                # in-file SPDX-License-Identifier tag takes priority
                 if cfg.should_conclude_file_licenses:
                     f.concluded_license = expression
                 f.license_info_in_file = split_expression(expression)
+            elif reuse_licenses:
+                # fall back to REUSE.toml / .reuse/dep5 bulk annotation
+                combined = " AND ".join(
+                    f"({e})" if " " in e else e for e in reuse_licenses
+                )
+                if cfg.should_conclude_file_licenses:
+                    f.concluded_license = combined
+                f.license_info_in_file = []
+                for lic_expr in reuse_licenses:
+                    f.license_info_in_file.extend(split_expression(lic_expr))
+                f.license_info_in_file = sorted(set(f.license_info_in_file))
 
-            if copyrights := get_copyright_info(f.path):
+            if copyrights:
                 f.copyright_text = "<text>\n" + "\n".join(copyrights) + "\n</text>"
 
             # check if any custom license IDs should be flagged for SBOM
