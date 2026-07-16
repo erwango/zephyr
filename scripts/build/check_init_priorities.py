@@ -46,6 +46,11 @@ _IGNORE_COMPATIBLES = frozenset(
         # device controller, the logical connection is established after USB
         # device support is enabled.
         "zephyr,cdc-acm-uart",
+        # The XSPI Manager (XSPIM) references the XSPI controller nodes only to
+        # hardware mux configuration.
+        # There is no runtime initialization dependency: XSPIM must initialize
+        # BEFORE the XSPI controllers it manages, not after them.
+        "st,stm32-xspim",
     ]
 )
 
