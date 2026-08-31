@@ -154,12 +154,16 @@ properties:
     type: array
     description: |
       Array of parameters to configure the memory map feature.
-      enable: whether the memory map feature is enabled.
+      enable: whether the memory map feature is enabled, set with the
+              MSPI_MEMMAP_ENABLED or MSPI_MEMMAP_DISABLED macro from
+              <zephyr/dt-bindings/mspi/mspi.h>.
       address_offset: The offset in bytes to the start of the
                       platform specific memory mapped address region.
       size: The size in bytes of the memory mapped address region one
             wish to enable or disable.
-      permission: The permission granted to the region. (RW/RO)
+      permission: The permission granted to the region, set with the
+                  MSPI_MEMMAP_READ_WRITE or MSPI_MEMMAP_READ_ONLY macro
+                  from <zephyr/dt-bindings/mspi/mspi.h>.
 
       For controller that support this feature. One may map the device
       memory into Soc system memory map. i.e. memory mapped address region
@@ -167,10 +171,10 @@ properties:
 
       default =
       <
-        .enable         = false;
+        .enable         = MSPI_MEMMAP_DISABLED;
         .address_offset = 0;
         .size           = 0;
-        .permission     = 0;
+        .permission     = MSPI_MEMMAP_READ_WRITE;
       >
 
   scramble-config:
