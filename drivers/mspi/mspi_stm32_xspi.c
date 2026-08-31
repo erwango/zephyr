@@ -1026,7 +1026,7 @@ static int read_write_in_memory_map_mode(const struct device *dev,
 		return 0;
 	}
 
-	if (!dev_data->memmap_cfg.permission) {
+	if (dev_data->memmap_cfg.permission == MSPI_MEMMAP_READ_WRITE) {
 		LOG_INF("Memory-mapped write from 0x%08lx, len %u", mmap_addr, packet->num_bytes);
 		memcpy((void *)mmap_addr, packet->data_buf, packet->num_bytes);
 		k_sleep(K_MSEC(1));
